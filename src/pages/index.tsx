@@ -165,7 +165,8 @@ export default function Home() {
                 {mode === 'roi' ? (
                   <ResultCharts results={roiResults} />
                 ) : (
-                  <JobAnalysis shopMetrics={shopMetrics} individualJobs={jobs} />
+                  // <JobAnalysis shopMetrics={shopMetrics} individualJobs={jobs} />
+                  <JobAnalysis shopMetrics={shopMetrics} />
                 )}
               </TabsContent>
 

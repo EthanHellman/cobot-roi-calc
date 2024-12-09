@@ -1,7 +1,6 @@
 import { WeldJob, JobEfficiencyMetrics, TimeBreakdown } from '@/types/weld-jobs';
 
 const MINUTES_PER_HOUR = 60;
-const WORKING_DAYS_PER_YEAR = 250;
 
 export interface ShopEfficiencyMetrics {
   totalJobs: number;
@@ -27,6 +26,20 @@ export interface ShopEfficiencyMetrics {
   };
 }
 
+function calculateSinglePartTime(
+  length: number,
+  passes: number,
+  travelSpeed: number,
+  efficiency: number,
+  isManual: boolean
+): number {
+  if (travelSpeed <= 0) throw new Error('Travel speed must be greater than 0');
+  if (efficiency <= 0) throw new Error('Efficiency must be greater than 0');
+
+  const baseTime = (length * passes) / travelSpeed;
+  return isManual ? baseTime / (efficiency / 100) : baseTime * (efficiency / 100);
+}
+
 export function calculateJobEfficiency(job: WeldJob): JobEfficiencyMetrics {
   const manual: TimeBreakdown = {
     weldTime: 0,
@@ -38,33 +51,49 @@ export function calculateJobEfficiency(job: WeldJob): JobEfficiencyMetrics {
     totalCycleTime: 0
   };
 
-  // Calculate annual times for each part
+  // Calculate total time for each part
   job.parts.forEach(({ part, quantity }) => {
-    // Calculate base time for one part
-    const singlePartManualBaseTime = (part.length * part.passes) / part.manualTravelSpeed;
-    const singlePartCobotBaseTime = (part.length * part.passes) / part.cobotTravelSpeed;
+    try {
+      // Calculate time for one part
+      const singlePartManualTime = calculateSinglePartTime(
+        part.length,
+        part.passes,
+        part.manualTravelSpeed,
+        part.manualEfficiency,
+        true
+      );
+      
+      const singlePartCobotTime = calculateSinglePartTime(
+        part.length,
+        part.passes,
+        part.cobotTravelSpeed,
+        part.cobotEfficiency,
+        false
+      );
 
-    // Apply efficiency factors
-    const singlePartManualTime = singlePartManualBaseTime / (part.manualEfficiency / 100);
-    const singlePartCobotTime = singlePartCobotBaseTime * (part.cobotEfficiency / 100);
-
-    // Calculate total annual time for this part (quantity * annual demand)
-    const annualPartManualTime = singlePartManualTime * quantity * job.annualDemand;
-    const annualPartCobotTime = singlePartCobotTime * quantity * job.annualDemand;
-
-    // Add to total times
-    manual.weldTime += annualPartManualTime;
-    cobot.weldTime += annualPartCobotTime;
+      // Calculate total annual time for this part type
+      const totalPartsPerYear = quantity * job.annualDemand;
+      manual.weldTime += singlePartManualTime * totalPartsPerYear;
+      cobot.weldTime += singlePartCobotTime * totalPartsPerYear;
+    } catch (error) {
+      console.error(`Error calculating times for part ${part.name}:`, error);
+      // Continue with next part instead of failing completely
+    }
   });
 
-  // Set total cycle times (for now, just using weld times)
+  // Set total cycle times (currently just weld times, can be expanded)
   manual.totalCycleTime = manual.weldTime;
   cobot.totalCycleTime = cobot.weldTime;
 
-  // Calculate improvements
-  const cycleTimeReduction = ((manual.totalCycleTime - cobot.totalCycleTime) / manual.totalCycleTime) * 100;
+  // Calculate improvements (with safety checks)
+  const cycleTimeReduction = manual.totalCycleTime > 0 
+    ? ((manual.totalCycleTime - cobot.totalCycleTime) / manual.totalCycleTime) * 100
+    : 0;
+
   const laborTimeSaved = (manual.totalCycleTime - cobot.totalCycleTime) / MINUTES_PER_HOUR;
-  const throughputIncrease = ((manual.totalCycleTime / cobot.totalCycleTime) - 1) * 100;
+  const throughputIncrease = cobot.totalCycleTime > 0
+    ? ((manual.totalCycleTime / cobot.totalCycleTime) - 1) * 100
+    : 0;
 
   return {
     manual,
@@ -79,7 +108,7 @@ export function calculateJobEfficiency(job: WeldJob): JobEfficiencyMetrics {
 }
 
 export function calculateShopEfficiency(jobs: WeldJob[]): ShopEfficiencyMetrics {
-  if (jobs.length === 0) {
+  if (!Array.isArray(jobs) || jobs.length === 0) {
     return {
       totalJobs: 0,
       uniqueParts: 0,
@@ -98,7 +127,7 @@ export function calculateShopEfficiency(jobs: WeldJob[]): ShopEfficiencyMetrics 
   // Calculate unique parts and total annual parts
   const uniqueParts = jobs.reduce((sum, job) => sum + job.parts.length, 0);
   const totalAnnualParts = jobs.reduce((sum, job) => 
-    sum + job.parts.reduce((jobSum, { part, quantity }) => 
+    sum + job.parts.reduce((jobSum, { quantity }) => 
       jobSum + (quantity * job.annualDemand), 0
     ), 0
   );
@@ -109,7 +138,7 @@ export function calculateShopEfficiency(jobs: WeldJob[]): ShopEfficiencyMetrics 
     metrics: calculateJobEfficiency(job)
   }));
 
-  // Sum up total times across all jobs
+  // Calculate shop-wide metrics
   const manualTimes = jobMetrics.reduce((total, { metrics }) => ({
     totalWeldTime: total.totalWeldTime + metrics.manual.weldTime,
     totalCycleTime: total.totalCycleTime + metrics.manual.totalCycleTime
@@ -122,6 +151,13 @@ export function calculateShopEfficiency(jobs: WeldJob[]): ShopEfficiencyMetrics 
 
   const totalLaborSaved = (manualTimes.totalCycleTime - cobotTimes.totalCycleTime) / MINUTES_PER_HOUR;
 
+  // Calculate averages (only if there are jobs)
+  const averageCycleTimeReduction = jobMetrics.reduce((sum, { metrics }) => 
+    sum + metrics.improvements.cycleTimeReduction, 0) / jobs.length;
+
+  const averageThroughputIncrease = jobMetrics.reduce((sum, { metrics }) => 
+    sum + metrics.improvements.throughputIncrease, 0) / jobs.length;
+
   return {
     totalJobs: jobs.length,
     uniqueParts,
@@ -130,10 +166,8 @@ export function calculateShopEfficiency(jobs: WeldJob[]): ShopEfficiencyMetrics 
     cobot: cobotTimes,
     improvements: {
       totalLaborSaved: Math.max(0, totalLaborSaved),
-      averageCycleTimeReduction: jobMetrics.reduce((sum, { metrics }) => 
-        sum + metrics.improvements.cycleTimeReduction, 0) / jobs.length,
-      averageThroughputIncrease: jobMetrics.reduce((sum, { metrics }) => 
-        sum + metrics.improvements.throughputIncrease, 0) / jobs.length,
+      averageCycleTimeReduction: Math.max(0, averageCycleTimeReduction),
+      averageThroughputIncrease: Math.max(0, averageThroughputIncrease),
       jobBreakdown: jobMetrics.map(({ job, metrics }) => ({
         jobName: job.name,
         laborSaved: metrics.improvements.laborTimeSaved,

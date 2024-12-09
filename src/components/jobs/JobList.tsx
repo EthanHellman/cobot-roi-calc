@@ -43,7 +43,7 @@ const JobList: React.FC<JobListProps> = ({ jobs, onEdit, onDelete }) => {
                 <TableCell className="font-medium">{job.name}</TableCell>
                 <TableCell>{job.parts.length} parts</TableCell>
                 <TableCell>{job.annualDemand.toLocaleString()}</TableCell>
-                <TableCell>{job.batchSize}</TableCell>
+                {/* <TableCell>{job.batchSize}</TableCell> */}
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-2">
                     <Button

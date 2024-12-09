@@ -1,15 +1,13 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { WeldJob } from '@/types/weld-jobs';
 import { ShopEfficiencyMetrics } from '@/utils/job-calculations';
 
 interface JobAnalysisProps {
   shopMetrics: ShopEfficiencyMetrics;
-  individualJobs: WeldJob[];
 }
 
-const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics, individualJobs }) => {
+const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics }) => {
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = Math.round(minutes % 60);
@@ -21,6 +19,11 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics, individualJobs }
     'Labor Saved': Math.round(job.laborSaved),
     'Cycle Time Reduction': Math.round(job.cycleTimeReduction)
   }));
+
+  const formatTooltipValue = (value: number, name: string) => {
+    if (name === 'Labor Saved') return `${value} hours`;
+    return `${value}%`;
+  };
 
   return (
     <div className="space-y-6">
@@ -60,9 +63,9 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics, individualJobs }
         <CardContent>
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div className="space-y-2">
-                <p className="text-sm text-gray-600">Number of Jobs: {shopMetrics.totalJobs}</p>
-                <p className="text-sm text-gray-600">Unique Parts: {shopMetrics.uniqueParts}</p>
-                <p className="text-sm text-gray-600">Total Annual Parts: {shopMetrics.totalAnnualParts.toLocaleString()}</p>
+              <p className="text-sm text-gray-600">Number of Jobs: {shopMetrics.totalJobs}</p>
+              <p className="text-sm text-gray-600">Unique Parts: {shopMetrics.uniqueParts}</p>
+              <p className="text-sm text-gray-600">Total Annual Parts: {shopMetrics.totalAnnualParts.toLocaleString()}</p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-gray-600">Manual Weld Time: {formatTime(shopMetrics.manual.totalWeldTime)}/year</p>
@@ -71,14 +74,18 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics, individualJobs }
             </div>
           </div>
 
-          <div style={{ width: '100%', height: '500px' }}>
-            <ResponsiveContainer>
+          <div className="h-[400px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart 
                 data={jobSavingsData}
                 margin={{ top: 20, right: 60, left: 60, bottom: 20 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
+                <XAxis 
+                  dataKey="name"
+                  tick={{ fontSize: 12 }}
+                  interval={0}
+                />
                 <YAxis 
                   yAxisId="left" 
                   label={{ 
@@ -87,6 +94,7 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics, individualJobs }
                     position: 'insideLeft',
                     offset: -40
                   }}
+                  tick={{ fontSize: 12 }}
                 />
                 <YAxis 
                   yAxisId="right" 
@@ -97,11 +105,30 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics, individualJobs }
                     position: 'insideRight',
                     offset: -30
                   }}
+                  tick={{ fontSize: 12 }}
                 />
-                <Tooltip />
-                <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                <Bar yAxisId="left" dataKey="Labor Saved" fill="#6366f1" />
-                <Bar yAxisId="right" dataKey="Cycle Time Reduction" fill="#22c55e" />
+                <Tooltip 
+                  formatter={formatTooltipValue}
+                  contentStyle={{ fontSize: '12px' }}
+                />
+                <Legend 
+                  wrapperStyle={{ 
+                    paddingTop: '20px',
+                    fontSize: '12px'
+                  }} 
+                />
+                <Bar 
+                  yAxisId="left" 
+                  dataKey="Labor Saved" 
+                  fill="#6366f1" 
+                  name="Labor Hours Saved/Year"
+                />
+                <Bar 
+                  yAxisId="right" 
+                  dataKey="Cycle Time Reduction" 
+                  fill="#22c55e" 
+                  name="Cycle Time Reduction %"
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>

@@ -1,44 +1,47 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 import { CalculatorResults } from '@/types/calculator';
-import { motion } from 'framer-motion';
-import debounce from 'lodash/debounce';
+import { debounce } from 'lodash';
 
 interface ResultChartsProps {
   results: CalculatorResults;
 }
 
-const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
-  const [prevResults, setPrevResults] = useState<CalculatorResults | null>(null);
-  const [highlightChanges, setHighlightChanges] = useState<{ [key: string]: 'increase' | 'decrease' | null }>({});
-
-  // Debounced update checker
-  const checkForChanges = useCallback(
-    debounce((newResults: CalculatorResults) => {
-      if (!prevResults) {
+interface HighlightChanges {
+    [key: string]: 'increase' | 'decrease' | null;
+  }
+  
+  const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
+    const [prevResults, setPrevResults] = useState<CalculatorResults | null>(null);
+    const [highlightChanges, setHighlightChanges] = useState<HighlightChanges>({});
+  
+    useEffect(() => {
+      const debouncedCheck = debounce((newResults: CalculatorResults) => {
+        if (!prevResults) {
+          setPrevResults(newResults);
+          return;
+        }
+  
+        const changes: HighlightChanges = {
+          profit: newResults.profit.opex.duringLease > prevResults.profit.opex.duringLease ? 'increase' : 'decrease',
+          productivity: newResults.production.partsPerWeekCobot > prevResults.production.partsPerWeekCobot ? 'increase' : 'decrease',
+          roi: newResults.roi.opex.threeYearReturn > prevResults.roi.opex.threeYearReturn ? 'increase' : 'decrease'
+        };
+  
+        setHighlightChanges(changes);
         setPrevResults(newResults);
-        return;
-      }
-
-      const changes = {
-        profit: newResults.profit.opex.duringLease > prevResults.profit.opex.duringLease ? 'increase' : 'decrease',
-        productivity: newResults.production.partsPerWeekCobot > prevResults.production.partsPerWeekCobot ? 'increase' : 'decrease',
-        roi: newResults.roi.opex.threeYearReturn > prevResults.roi.opex.threeYearReturn ? 'increase' : 'decrease'
+  
+        // Clear highlights after a short delay
+        setTimeout(() => setHighlightChanges({}), 1500);
+      }, 500);
+  
+      debouncedCheck(results);
+  
+      return () => {
+        debouncedCheck.cancel();
       };
-
-      setHighlightChanges(changes);
-      setPrevResults(newResults);
-
-      // Clear highlights after a short delay
-      setTimeout(() => setHighlightChanges({}), 1500);
-    }, 500),
-    [prevResults]
-  );
-
-  useEffect(() => {
-    checkForChanges(results);
-  }, [results, checkForChanges]);
+    }, [results, prevResults]);
 
   const getHighlightColor = (key: string) => {
     const change = highlightChanges[key];
@@ -47,9 +50,12 @@ const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
     return 'text-gray-900';
   };
 
+  const formatCurrency = (value: number) => 
+    `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
   return (
     <div className="space-y-8">
-      {/* Key Metrics - Always visible, subtle highlights */}
+      {/* Key Metrics */}
       <Card className="bg-white">
         <CardContent className="pt-6">
           <div className="grid grid-cols-3 gap-4">
@@ -68,14 +74,14 @@ const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
             <div className="p-4 rounded-lg border transition-colors duration-300">
               <p className="text-sm text-gray-600">3-Year Return</p>
               <p className={`text-2xl font-bold transition-colors duration-300 ${getHighlightColor('roi')}`}>
-                ${Math.max(results.roi.opex.threeYearReturn, results.roi.capex.threeYearReturn).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {formatCurrency(Math.max(results.roi.opex.threeYearReturn, results.roi.capex.threeYearReturn))}
               </p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Charts - No animation on continuous updates */}
+      {/* Cumulative Return Chart */}
       <Card>
         <CardContent className="pt-6">
           <h3 className="text-lg font-semibold mb-4">5-Year Cumulative Return</h3>
@@ -89,7 +95,7 @@ const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="year" />
               <YAxis />
-              <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
               <Legend />
               <Line type="monotone" dataKey="Manual" stroke="#8884d8" strokeWidth={2} />
               <Line type="monotone" dataKey="OPEX (Lease)" stroke="#82ca9d" strokeWidth={2} />
@@ -99,6 +105,7 @@ const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
         </CardContent>
       </Card>
 
+      {/* Cost and Productivity Charts */}
       <div className="grid grid-cols-2 gap-6">
         <Card>
           <CardContent className="pt-6">
@@ -112,7 +119,7 @@ const ResultCharts: React.FC<ResultChartsProps> = ({ results }) => {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
-              <Tooltip formatter={(value) => `$${Number(value).toLocaleString()}`} />
+              <Tooltip formatter={(value) => formatCurrency(Number(value))} />
               <Bar dataKey="cost" fill="#82ca9d" />
             </BarChart>
           </CardContent>

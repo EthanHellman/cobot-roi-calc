@@ -1,6 +1,9 @@
 const JOBS_STORAGE_KEY = 'weld-jobs';
 
-export const saveJobsToStorage = (jobs: any[]) => {
+// Add proper typing instead of any
+import { WeldJob } from '@/types/weld-jobs';
+
+export const saveJobsToStorage = (jobs: WeldJob[]) => {
   try {
     localStorage.setItem(JOBS_STORAGE_KEY, JSON.stringify(jobs));
   } catch (error) {
