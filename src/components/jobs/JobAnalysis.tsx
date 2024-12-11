@@ -14,15 +14,39 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics }) => {
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const jobSavingsData = shopMetrics.improvements.jobBreakdown.map(job => ({
+  // Transform the data for the chart
+  const jobComparisonData = shopMetrics.improvements.jobBreakdown.map((job) => ({
     name: job.jobName,
-    'Labor Saved': Math.round(job.laborSaved),
-    'Cycle Time Reduction': Math.round(job.cycleTimeReduction)
+    'Manual Time': job.manualTime,  // We'll need to add these to the jobBreakdown interface
+    'Cobot Time': job.cobotTime,    // We'll need to add these to the jobBreakdown interface
+    laborSaved: job.laborSaved,
+    cycleTimeReduction: job.cycleTimeReduction
   }));
 
-  const formatTooltipValue = (value: number, name: string) => {
-    if (name === 'Labor Saved') return `${value} hours`;
-    return `${value}%`;
+  // Custom tooltip component
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const manualTime = payload[0].value;
+      const cobotTime = payload[1].value;
+      const data = payload[0].payload;
+      
+      return (
+        <div className="bg-white p-4 shadow-lg rounded-lg border">
+          <p className="font-semibold mb-2">{label}</p>
+          <div className="space-y-1 text-sm">
+            <p><span className="text-indigo-600">Manual Time:</span> {formatTime(manualTime)}</p>
+            <p><span className="text-emerald-600">Cobot Time:</span> {formatTime(cobotTime)}</p>
+            <p className="border-t pt-1 mt-2">
+              <span className="text-blue-600">Labor Saved:</span> {Math.round(data.laborSaved)} hours/year
+            </p>
+            <p>
+              <span className="text-blue-600">Cycle Time Reduction:</span> {data.cycleTimeReduction.toFixed(1)}%
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -58,7 +82,7 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics }) => {
       {/* Shop Overview */}
       <Card>
         <CardHeader>
-          <CardTitle>Shop Overview</CardTitle>
+          <CardTitle>Job Time Comparison</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -77,8 +101,8 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics }) => {
           <div className="h-[400px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart 
-                data={jobSavingsData}
-                margin={{ top: 20, right: 60, left: 60, bottom: 20 }}
+                data={jobComparisonData}
+                margin={{ top: 20, right: 30, left: 30, bottom: 20 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis 
@@ -87,47 +111,25 @@ const JobAnalysis: React.FC<JobAnalysisProps> = ({ shopMetrics }) => {
                   interval={0}
                 />
                 <YAxis 
-                  yAxisId="left" 
                   label={{ 
-                    value: 'Hours Saved per Year', 
+                    value: 'Time (minutes)', 
                     angle: -90, 
                     position: 'insideLeft',
-                    offset: -40
+                    offset: -10
                   }}
                   tick={{ fontSize: 12 }}
                 />
-                <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  label={{ 
-                    value: 'Cycle Time Reduction %', 
-                    angle: 90, 
-                    position: 'insideRight',
-                    offset: -30
-                  }}
-                  tick={{ fontSize: 12 }}
-                />
-                <Tooltip 
-                  formatter={formatTooltipValue}
-                  contentStyle={{ fontSize: '12px' }}
-                />
-                <Legend 
-                  wrapperStyle={{ 
-                    paddingTop: '20px',
-                    fontSize: '12px'
-                  }} 
-                />
+                <Tooltip content={<CustomTooltip />} />
+                <Legend />
                 <Bar 
-                  yAxisId="left" 
-                  dataKey="Labor Saved" 
+                  dataKey="Manual Time" 
                   fill="#6366f1" 
-                  name="Labor Hours Saved/Year"
+                  name="Manual Process"
                 />
                 <Bar 
-                  yAxisId="right" 
-                  dataKey="Cycle Time Reduction" 
+                  dataKey="Cobot Time" 
                   fill="#22c55e" 
-                  name="Cycle Time Reduction %"
+                  name="Cobot Process"
                 />
               </BarChart>
             </ResponsiveContainer>

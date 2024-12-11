@@ -5,6 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import InputForm from '@/components/calculator/InputForm';
 import ResultCharts from '@/components/calculator/ResultCharts';
 import JobAnalysis from '@/components/jobs/JobAnalysis';
@@ -19,6 +21,7 @@ import { saveJobsToStorage, loadJobsFromStorage } from '@/utils/local-storage';
 export default function Home() {
   const [mounted, setMounted] = useState(false);
   const [mode, setMode] = useState<'roi' | 'time'>('roi');
+  const [showFinancing, setShowFinancing] = useState(false);
   
   // ROI Calculator state
   const [inputs, setInputs] = useState<CalculatorInputs>({
@@ -65,6 +68,18 @@ export default function Home() {
     saveJobsToStorage(jobs);
   }, [jobs]);
 
+  const getPageTitle = () => {
+    return mode === 'roi' 
+      ? "Automation ROI Calculation"
+      : "Cobot vs. Manual Efficiency Analysis";
+  };
+
+  const getPageDescription = () => {
+    return mode === 'roi'
+      ? "Calculate and analyze the return on investment for implementing collaborative robots in welding operations."
+      : "Compare manual and cobot welding efficiency across your welding operations.";
+  };
+
   if (!mounted) {
     return null;
   }
@@ -86,19 +101,19 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Cobot Analysis Tool</h1>
-          <p className="mt-2 text-gray-600">
-            Analyze ROI and efficiency improvements for implementing collaborative robots in welding operations.
-          </p>
-        </div>
-
         <Tabs value={mode} onValueChange={(value) => setMode(value as 'roi' | 'time')} className="mb-6">
           <TabsList className="w-full justify-start">
             <TabsTrigger value="roi" className="flex-1">ROI Analysis</TabsTrigger>
             <TabsTrigger value="time" className="flex-1">Time Analysis</TabsTrigger>
           </TabsList>
         </Tabs>
+
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">{getPageTitle()}</h1>
+          <p className="mt-2 text-gray-600">
+            {getPageDescription()}
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Input Section - 4 columns */}
@@ -118,9 +133,25 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardContent className="p-4">
-                {mode === 'roi' ? (
-                  <InputForm inputs={inputs} onInputChange={setInputs} />
-                ) : (
+                {mode === 'roi' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                      <Switch
+                        id="financing-toggle"
+                        checked={showFinancing}
+                        onCheckedChange={setShowFinancing}
+                      />
+                      <Label htmlFor="financing-toggle">
+                        Include Financing (OPEX) Analysis
+                      </Label>
+                    </div>
+                    <InputForm 
+                      inputs={inputs} 
+                      onInputChange={setInputs}
+                    />
+                  </div>
+                )}
+                {mode === 'time' && (
                   <div className="space-y-2 max-h-[70vh] overflow-y-auto pr-2">
                     {jobs.map(job => (
                       <CollapsibleJobEditor
@@ -163,67 +194,73 @@ export default function Home() {
 
               <TabsContent value="analysis">
                 {mode === 'roi' ? (
-                  <ResultCharts results={roiResults} />
+                  <ResultCharts 
+                    results={roiResults} 
+                    showFinancing={showFinancing}
+                  />
                 ) : (
-                  // <JobAnalysis shopMetrics={shopMetrics} individualJobs={jobs} />
                   <JobAnalysis shopMetrics={shopMetrics} />
                 )}
               </TabsContent>
 
               <TabsContent value="calculations">
                 {mode === 'roi' ? (
-                    <Card>
+                  <Card>
                     <CardContent className="p-6">
-                        <h3 className="text-lg font-semibold mb-4">Calculation Methodology</h3>
-                        
-                        <div className="space-y-6">
+                      <h3 className="text-lg font-semibold mb-4">Calculation Methodology</h3>
+                      
+                      <div className="space-y-6">
                         <section>
-                            <h4 className="font-semibold text-gray-700 mb-2">Production Calculations</h4>
-                            <div className="space-y-2 text-sm">
+                          <h4 className="font-semibold text-gray-700 mb-2">Production Calculations</h4>
+                          <div className="space-y-2 text-sm">
                             <p><strong>Manual Weld Hours/Week:</strong> {inputs.shop.hoursPerWeek} × {(inputs.shop.welderOnTimePercent/100).toFixed(2)} = {roiResults.production.partsPerWeekManual.toFixed(1)} parts</p>
                             <p><strong>Cobot Weld Hours/Week:</strong> {inputs.shop.hoursPerWeek} × {(inputs.shop.cobotWeldTimePercent/100).toFixed(2)} = {roiResults.production.partsPerWeekCobot.toFixed(1)} parts</p>
                             <p><strong>Annual Revenue (Manual):</strong> ${roiResults.production.moneyPerYearManual.toFixed(2)}</p>
                             <p><strong>Annual Revenue (Cobot):</strong> ${roiResults.production.moneyPerYearCobot.toFixed(2)}</p>
-                            </div>
+                          </div>
                         </section>
 
                         <section>
-                            <h4 className="font-semibold text-gray-700 mb-2">Operating Costs</h4>
-                            <div className="space-y-2 text-sm">
+                          <h4 className="font-semibold text-gray-700 mb-2">Operating Costs</h4>
+                          <div className="space-y-2 text-sm">
                             <p><strong>Manual Labor:</strong> ${roiResults.costs.manual.yearlyLabor.toFixed(2)}/year</p>
                             <p><strong>Cobot Power:</strong> {inputs.operating.cobotPowerConsumption}W × {inputs.operating.electricityPrice}/kWh × {inputs.weld.cobotDailyOpHours}hrs/day = ${(roiResults.costs.opex.operatingCostsPerYear/12).toFixed(2)}/month</p>
                             <p><strong>Materials (Manual):</strong> ${roiResults.costs.manual.yearlyMaterials.toFixed(2)}/year</p>
                             <p><strong>Materials (Cobot):</strong> ${roiResults.costs.opex.operatingCostsPerYear.toFixed(2)}/year</p>
-                            </div>
+                          </div>
                         </section>
 
-                        <section>
-                            <h4 className="font-semibold text-gray-700 mb-2">Financial Analysis</h4>
-                            <div className="space-y-2 text-sm">
-                            <p><strong>OPEX Monthly Lease:</strong> ${roiResults.costs.opex.monthlyLeaseCost.toFixed(2)}</p>
-                            <p><strong>CAPEX Depreciation:</strong> ${roiResults.costs.capex.yearlyDepreciation.toFixed(2)}/year</p>
-                            <p><strong>Annual Profit (Manual):</strong> ${roiResults.profit.manual.toFixed(2)}</p>
-                            <p><strong>Annual Profit (OPEX):</strong> ${roiResults.profit.opex.duringLease.toFixed(2)}</p>
-                            <p><strong>Annual Profit (CAPEX):</strong> ${roiResults.profit.capex.toFixed(2)}</p>
-                            </div>
-                        </section>
+                        {showFinancing && (
+                          <>
+                            <section>
+                              <h4 className="font-semibold text-gray-700 mb-2">Financial Analysis</h4>
+                              <div className="space-y-2 text-sm">
+                                <p><strong>OPEX Monthly Lease:</strong> ${roiResults.costs.opex.monthlyLeaseCost.toFixed(2)}</p>
+                                <p><strong>CAPEX Depreciation:</strong> ${roiResults.costs.capex.yearlyDepreciation.toFixed(2)}/year</p>
+                                <p><strong>Annual Profit (Manual):</strong> ${roiResults.profit.manual.toFixed(2)}</p>
+                                <p><strong>Annual Profit (OPEX):</strong> ${roiResults.profit.opex.duringLease.toFixed(2)}</p>
+                                <p><strong>Annual Profit (CAPEX):</strong> ${roiResults.profit.capex.toFixed(2)}</p>
+                              </div>
+                            </section>
 
-                        <section>
-                            <h4 className="font-semibold text-gray-700 mb-2">ROI Breakdown</h4>
-                            <div className="space-y-2 text-sm">
-                            <p><strong>OPEX Payback Period:</strong> ${inputs.financing.totalCobotCost.toFixed(2)} ÷ ${(roiResults.profit.opex.duringLease - roiResults.profit.manual).toFixed(2)} = {roiResults.roi.opex.paybackPeriod.toFixed(2)} years</p>
-                            <p><strong>CAPEX Payback Period:</strong> ${inputs.financing.totalCobotCost.toFixed(2)} ÷ ${(roiResults.profit.capex - roiResults.profit.manual).toFixed(2)} = {roiResults.roi.capex.paybackPeriod.toFixed(2)} years</p>
-                            <p><strong>3-Year Return (OPEX):</strong> ${roiResults.roi.opex.threeYearReturn.toFixed(2)}</p>
-                            <p><strong>3-Year Return (CAPEX):</strong> ${roiResults.roi.capex.threeYearReturn.toFixed(2)}</p>
-                            </div>
-                        </section>
-                        </div>
+                            <section>
+                              <h4 className="font-semibold text-gray-700 mb-2">ROI Breakdown</h4>
+                              <div className="space-y-2 text-sm">
+                              <p><strong>OPEX Payback Period:</strong> ${inputs.financing.totalCobotCost.toFixed(2)} ÷ ${(roiResults.profit.opex.duringLease - roiResults.profit.manual).toFixed(2)} = {Math.round(roiResults.roi.opex.paybackPeriod * 12)} months</p>
+                              <p><strong>CAPEX Payback Period:</strong> ${inputs.financing.totalCobotCost.toFixed(2)} ÷ ${(roiResults.profit.capex - roiResults.profit.manual).toFixed(2)} = {Math.round(roiResults.roi.capex.paybackPeriod * 12)} months</p>
+                                <p><strong>3-Year Return (OPEX):</strong> ${roiResults.roi.opex.threeYearReturn.toFixed(2)}</p>
+                                <p><strong>3-Year Return (CAPEX):</strong> ${roiResults.roi.capex.threeYearReturn.toFixed(2)}</p>
+                              </div>
+                            </section>
+                          </>
+                        )}
+                      </div>
                     </CardContent>
-                    </Card>
+                  </Card>
                 ) : (
-                    <JobCalculationBreakdown shopMetrics={shopMetrics} jobs={jobs} />
+                  <JobCalculationBreakdown shopMetrics={shopMetrics} jobs={jobs} />
                 )}
-                </TabsContent>
+              </TabsContent>
             </Tabs>
           </div>
         </div>

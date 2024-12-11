@@ -2,29 +2,33 @@ import { WeldJob, JobEfficiencyMetrics, TimeBreakdown } from '@/types/weld-jobs'
 
 const MINUTES_PER_HOUR = 60;
 
+interface JobBreakdown {
+    jobName: string;
+    manualTime: number;         // minutes per job
+    cobotTime: number;          // minutes per job
+    laborSaved: number;         // hours per year
+    cycleTimeReduction: number; // percentage
+  }
+  
 export interface ShopEfficiencyMetrics {
-  totalJobs: number;
-  uniqueParts: number;
-  totalAnnualParts: number;
-  manual: {
-    totalWeldTime: number;     // minutes per year
-    totalCycleTime: number;    // minutes per year
-  };
-  cobot: {
-    totalWeldTime: number;     // minutes per year
-    totalCycleTime: number;    // minutes per year
-  };
-  improvements: {
-    totalLaborSaved: number;           // hours per year
-    averageCycleTimeReduction: number; // percentage
-    averageThroughputIncrease: number; // percentage
-    jobBreakdown: Array<{
-      jobName: string;
-      laborSaved: number;              // hours per year
-      cycleTimeReduction: number;      // percentage
-    }>;
-  };
-}
+    totalJobs: number;
+    uniqueParts: number;
+    totalAnnualParts: number;
+    manual: {
+      totalWeldTime: number;     // minutes per year
+      totalCycleTime: number;    // minutes per year
+    };
+    cobot: {
+      totalWeldTime: number;     // minutes per year
+      totalCycleTime: number;    // minutes per year
+    };
+    improvements: {
+      totalLaborSaved: number;           // hours per year
+      averageCycleTimeReduction: number; // percentage
+      averageThroughputIncrease: number; // percentage
+      jobBreakdown: JobBreakdown[];
+    };
+  }
 
 function calculateSinglePartTime(
   length: number,
@@ -158,21 +162,23 @@ export function calculateShopEfficiency(jobs: WeldJob[]): ShopEfficiencyMetrics 
   const averageThroughputIncrease = jobMetrics.reduce((sum, { metrics }) => 
     sum + metrics.improvements.throughputIncrease, 0) / jobs.length;
 
-  return {
-    totalJobs: jobs.length,
-    uniqueParts,
-    totalAnnualParts,
-    manual: manualTimes,
-    cobot: cobotTimes,
-    improvements: {
-      totalLaborSaved: Math.max(0, totalLaborSaved),
-      averageCycleTimeReduction: Math.max(0, averageCycleTimeReduction),
-      averageThroughputIncrease: Math.max(0, averageThroughputIncrease),
-      jobBreakdown: jobMetrics.map(({ job, metrics }) => ({
-        jobName: job.name,
-        laborSaved: metrics.improvements.laborTimeSaved,
-        cycleTimeReduction: metrics.improvements.cycleTimeReduction
-      }))
-    }
-  };
+    return {
+        totalJobs: jobs.length,
+        uniqueParts,
+        totalAnnualParts,
+        manual: manualTimes,
+        cobot: cobotTimes,
+        improvements: {
+          totalLaborSaved: Math.max(0, totalLaborSaved),
+          averageCycleTimeReduction: Math.max(0, averageCycleTimeReduction),
+          averageThroughputIncrease: Math.max(0, averageThroughputIncrease),
+          jobBreakdown: jobMetrics.map(({ job, metrics }) => ({
+            jobName: job.name,
+            manualTime: metrics.manual.totalCycleTime,
+            cobotTime: metrics.cobot.totalCycleTime,
+            laborSaved: metrics.improvements.laborTimeSaved,
+            cycleTimeReduction: metrics.improvements.cycleTimeReduction
+          }))
+        }
+      };
 }
